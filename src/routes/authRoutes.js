@@ -39,7 +39,7 @@ function buildAuthUrl(idpHint = null) {
  * @returns {string} Authorization URL
  */
 function buildUatidAuthUrl() {
-  const url = `${config.keycloak.host}/realms/${config.uatid.realm}/protocol/openid-connect/auth`;
+  const url = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/auth`;
   
   const credentials = {
     response_type: 'code',
@@ -347,7 +347,7 @@ router.get('/uatid/callback', async (req, res) => {
   
   try {
     // Exchange authorization code for access token using UATID realm
-    const tokenEndpoint = `${config.keycloak.host}/realms/${config.uatid.realm}/protocol/openid-connect/token`;
+    const tokenEndpoint = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/token`;
     
     const postData = {
       grant_type: 'authorization_code',
@@ -375,7 +375,7 @@ router.get('/uatid/callback', async (req, res) => {
     req.session.id_token = id_token;
     
     // Fetch user information
-    const userinfoEndpoint = `${config.keycloak.host}/realms/${config.uatid.realm}/protocol/openid-connect/userinfo`;
+    const userinfoEndpoint = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/userinfo`;
     
     const userinfoResponse = await axios.get(userinfoEndpoint, {
       headers: {
