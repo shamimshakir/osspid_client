@@ -21,7 +21,7 @@ $app->get('/', function (Request $request, Response $response) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSSPID Client Portal</title>
+    <title>ShakirAuth Hub - Unified Identity Portal</title>
     <style>
         * {
             margin: 0;
@@ -227,7 +227,8 @@ $app->get('/', function (Request $request, Response $response) {
 </head>
 <body>
     <div class="container">
-        <h1>🔐 OSSPID Client Portal 🔐</h1>';
+        <h1>🔐 ShakirAuth Hub 🔐</h1>
+        <h2 style="color: #667eea; font-size: 16px; font-weight: 400; margin-top: -10px; margin-bottom: 20px; text-align: center;">Your Gateway to Seamless Authentication</h2>';
     
         
     if (!isset($_SESSION['user'])) {
@@ -239,6 +240,7 @@ $app->get('/', function (Request $request, Response $response) {
             <a href="/osspid-login" class="btn btn-primary">Login with OSSPID (via Keycloak)</a>
             <a href="/banglabiz-login" class="btn btn-secondary">Login with BanglaBizz</a>
             <a href="/helloapp-login" class="btn btn-danger">Login with HelloApp</a>
+            <a href="/uatid-login" class="btn btn-primary">Login with UATID</a>
             <a href="/all-login" class="btn btn-success">All Login Options</a>
         </div>';
     }
@@ -301,6 +303,141 @@ $app->group('/api', function (RouteCollectorProxy $group) {
         $response->getBody()->write(json_encode($data));
         return $response->withHeader('Content-Type', 'application/json');
     });
+});
+
+/**
+ * UAT-ID Configuration Check Route
+ * Fetches and displays UAT-ID's OpenID Connect configuration
+ */
+$app->get('/check-uatid-config', function (Request $request, Response $response) {
+    // Try multiple possible well-known URLs
+    $possibleUrls = [
+        'https://uat-id.oss.net.bd/.well-known/openid-configuration',
+        'https://uat-id.oss.net.bd/osspid-client/.well-known/openid-configuration',
+        'https://uat-id.oss.net.bd/osspid-client/openid/.well-known/openid-configuration',
+        'https://uat-id.oss.net.bd/osspid-client/openid/v2/.well-known/openid-configuration',
+    ];
+    
+    $successConfig = null;
+    $successUrl = null;
+    $attempts = [];
+    
+    foreach ($possibleUrls as $wellKnownUrl) {
+        $ch = curl_init($wellKnownUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        
+        $curlResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        $attempts[] = [
+            'url' => $wellKnownUrl,
+            'status' => $httpCode,
+            'error' => $error
+        ];
+        
+        if ($httpCode == 200 && $curlResponse) {
+            $config = json_decode($curlResponse, true);
+            if ($config && isset($config['issuer'])) {
+                $successConfig = $config;
+                $successUrl = $wellKnownUrl;
+                break;
+            }
+        }
+    }
+    
+    $wellKnownUrl = $successUrl ?: $possibleUrls[0];
+    $curlResponse = $successConfig ? json_encode($successConfig) : null;
+    $httpCode = $successConfig ? 200 : $attempts[0]['status'];
+    $error = $successConfig ? null : $attempts[0]['error'];
+    
+    $html = '<!DOCTYPE html>
+<html>
+<head>
+    <title>UAT-ID Configuration Check</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 20px; border-radius: 8px; max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; }
+        pre { background: #f8f8f8; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .error { color: red; background: #ffebee; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { color: green; }
+        .info { background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .warning { background: #fff3e0; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>UAT-ID OpenID Connect Configuration</h1>';
+    
+    if ($successUrl) {
+        $html .= '<p><strong>✓ Found configuration at:</strong> ' . htmlspecialchars($successUrl) . '</p>';
+    } else {
+        $html .= '<h3>Attempted URLs:</h3><table><tr><th>URL</th><th>Status</th></tr>';
+        foreach ($attempts as $attempt) {
+            $html .= '<tr><td>' . htmlspecialchars($attempt['url']) . '</td><td>' . $attempt['status'] . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+    
+    if ($curlResponse && $httpCode == 200) {
+        $config = json_decode($curlResponse, true);
+        
+        $html .= '<div class="success"><strong>✓ Successfully fetched configuration</strong></div>';
+        
+        if (isset($config['scopes_supported'])) {
+            $html .= '<div class="info"><h3>Supported Scopes:</h3><ul>';
+            foreach ($config['scopes_supported'] as $scope) {
+                $html .= '<li>' . htmlspecialchars($scope) . '</li>';
+            }
+            $html .= '</ul><p><strong>Recommendation:</strong> Use these scopes in Keycloak: <code>' . 
+                     htmlspecialchars(implode(' ', $config['scopes_supported'])) . '</code></p></div>';
+        }
+        
+        $html .= '<h3>Full Configuration:</h3><pre>' . json_encode($config, JSON_PRETTY_PRINT) . '</pre>';
+    } else {
+        $html .= '<div class="error"><strong>✗ Could not find OpenID configuration</strong><br>';
+        $html .= 'None of the standard paths returned a valid configuration.</div>';
+        
+        $html .= '<div class="warning"><h3>⚠️ Workaround Solution</h3>
+        <p>Since UAT-ID doesn\'t have a discoverable well-known configuration, the scope issue is likely due to Keycloak\'s default settings.</p>
+        <h4>Try this in Keycloak:</h4>
+        <ol>
+            <li>Go to your UAT-ID identity provider settings in Keycloak</li>
+            <li>In the Keycloak admin, go to <strong>Configure → Client scopes</strong></li>
+            <li>Find any client scopes that have <code>offline_access</code></li>
+            <li>Or, try setting the UAT-ID provider to use <strong>prompt=none</strong> in advanced settings</li>
+            <li>Most commonly: The default mapper configuration sends scopes that UAT-ID doesn\'t support</li>
+        </ol>
+        <h4>Quick Fix - Try these scopes in Keycloak:</h4>
+        <ul>
+            <li><code>openid</code> - Only the basic scope</li>
+            <li><code>openid profile</code> - With profile information</li>
+            <li><code>openid profile email</code> - Full standard scopes</li>
+        </ul>
+        <p><strong>Remove these if present:</strong> <code>offline_access</code>, <code>microprofile-jwt</code>, or any custom scopes</p>
+        </div>';
+        
+        $html .= '<div class="info"><h3>Manual URLs to try:</h3><ul>';
+        foreach ($possibleUrls as $url) {
+            $html .= '<li><a href="' . htmlspecialchars($url) . '" target="_blank">' . htmlspecialchars($url) . '</a></li>';
+        }
+        $html .= '</ul></div>';
+    }
+    
+    $html .= '<p><a href="/">← Back to Home</a></p>
+    </div>
+</body>
+</html>';
+    
+    $response->getBody()->write($html);
+    return $response;
 });
 
 /**

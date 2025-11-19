@@ -22,6 +22,13 @@ define('OSSPID_CLIENT_ID', '2520c78a5763a4ca5154224a38da6faf2cbfd4ec');
 define('OSSPID_CLIENT_SECRET', '3e5ea9864ed71e05727a08611a1b1357b01f2f70');
 define('OSSPID_REDIRECT_URL', 'http://192.168.30.56:8010/osspid-direct/callback');
 
+// UATID Configuration (via Keycloak - separate realm and client)
+define('UATID_REALM', 'uat-id-realm');
+define('UATID_CLIENT_ID', 'uat-id-client');
+define('UATID_CLIENT_SECRET', 'RLSJW5eSqDokzmtObt4bHDiSH0YBpV9e');
+define('UATID_REDIRECT_URL', 'http://192.168.30.56:8010/uatid/callback');
+define('UATID_IDP_HINT', 'uatid');
+
 /**
  * Debug helper function
  * 
@@ -47,14 +54,37 @@ function buildAuthUrl(?string $idpHint = null): string
     $url = KHOST . '/realms/' . KRealms . '/protocol/openid-connect/auth';
     
     $credentials = [
+        'response_type' => 'code',
+        'scope' => 'openid email',
         'client_id' => KClientId,
         'redirect_uri' => RedirectURL,
-        'response_type' => 'code',
-        'scope' => 'openid',
     ];
-    
+  
     if ($idpHint !== null) {
         $credentials['kc_idp_hint'] = $idpHint;
+    }
+    
+    return $url . '?' . http_build_query($credentials);
+}
+
+/**
+ * Build authorization URL for UATID (separate Keycloak realm)
+ * 
+ * @return string Authorization URL
+ */
+function buildUatidAuthUrl(): string
+{
+    $url = KHOST . '/realms/' . UATID_REALM . '/protocol/openid-connect/auth';
+    
+    $credentials = [
+        'response_type' => 'code',
+        'scope' => 'openid profile email',
+        'client_id' => UATID_CLIENT_ID,
+        'redirect_uri' => UATID_REDIRECT_URL,
+    ];
+    
+    if (UATID_IDP_HINT) {
+        $credentials['kc_idp_hint'] = UATID_IDP_HINT;
     }
     
     return $url . '?' . http_build_query($credentials);
@@ -113,6 +143,15 @@ $app->get('/helloapp-login', function (Request $request, Response $response) {
 });
 
 /**
+ * UATID Login Route
+ * Redirects user to UATID Keycloak realm (separate realm with its own client)
+ */
+$app->get('/uatid-login', function (Request $request, Response $response) {
+    $authorizeUrl = buildUatidAuthUrl();
+    return $response->withHeader('Location', $authorizeUrl)->withStatus(302);
+});
+
+/**
  * All Login Options Route
  * Redirects user to Keycloak authentication page showing all available IDPs
  */
@@ -157,8 +196,20 @@ $app->get('/logout', function (Request $request, Response $response) {
         if ($idToken) {
             $params['id_token_hint'] = $idToken;
         }
+    } elseif ($loginType === 'uatid') {
+        // UATID Keycloak realm logout
+        $logoutUrl = KHOST . '/realms/' . UATID_REALM . '/protocol/openid-connect/logout';
+        
+        $params = [
+            'post_logout_redirect_uri' => 'http://192.168.30.56:8010/',
+            'client_id' => UATID_CLIENT_ID,
+        ];
+        
+        if ($idToken) {
+            $params['id_token_hint'] = $idToken;
+        }
     } else {
-        // Keycloak logout
+        // Default Keycloak logout
         $logoutUrl = KHOST . '/realms/' . KRealms . '/protocol/openid-connect/logout';
         
         $params = [
@@ -381,3 +432,93 @@ $app->get('/osspid-direct/callback', function (Request $request, Response $respo
         return $response->withStatus(500);
     }
 });
+
+/**
+ * UATID OAuth2 Callback Route
+ * Handles the callback from UATID Keycloak realm after user authentication
+ * Exchanges authorization code for access token and retrieves user information
+ */
+$app->get('/uatid/callback', function (Request $request, Response $response) {
+    $code = $request->getQueryParams()['code'] ?? null;
+    
+    if (empty($code)) {
+        $response->getBody()->write('Invalid callback: No authorization code received');
+        return $response->withStatus(400);
+    }
+    
+    try {
+        // Exchange authorization code for access token using UATID realm
+        $tokenEndpoint = KHOST . '/realms/' . UATID_REALM . '/protocol/openid-connect/token';
+        
+        $postData = [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'client_id' => UATID_CLIENT_ID,
+            'client_secret' => UATID_CLIENT_SECRET,
+            'redirect_uri' => UATID_REDIRECT_URL,
+        ];
+        
+        $ch = curl_init($tokenEndpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        
+        $curlResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($curlResponse === false) {
+            throw new Exception('Failed to connect to token endpoint.');
+        }
+        
+        $responseData = json_decode($curlResponse, true);
+        
+        if (!isset($responseData['access_token'])) {
+            $errorMsg = $responseData['error_description'] ?? 'Access token not found in response.';
+            throw new Exception($errorMsg);
+        }
+        
+        $accessToken = $responseData['access_token'];
+        
+        // Store tokens in session for logout and token refresh capability
+        session_start();
+        $_SESSION['login_type'] = 'uatid'; // Mark this as UATID login
+        if (isset($responseData['refresh_token'])) {
+            $_SESSION['refresh_token'] = $responseData['refresh_token'];
+        }
+        if (isset($responseData['id_token'])) {
+            $_SESSION['id_token'] = $responseData['id_token'];
+        }
+        
+        // Fetch user information using access token
+        $userinfoEndpoint = KHOST . '/realms/' . UATID_REALM . '/protocol/openid-connect/userinfo';
+        
+        $ch = curl_init($userinfoEndpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken
+        ]);
+        
+        $userinfoResponse = curl_exec($ch);
+        curl_close($ch);
+        
+        $userData = json_decode($userinfoResponse, true);
+        
+        if (isset($userData['preferred_username']) || isset($userData['sub'])) {
+            session_start();
+            $_SESSION['user'] = $userData;
+            
+            return $response->withHeader('Location', '/')->withStatus(302);
+        } else {
+            throw new Exception('Failed to retrieve user information.');
+        }
+        
+    } catch (Exception $e) {
+        // Log error for debugging (in production, use proper logging)
+        error_log('UATID OAuth Callback Error: ' . $e->getMessage());
+        
+        $response->getBody()->write('Authentication Error: ' . htmlspecialchars($e->getMessage()));
+        return $response->withStatus(500);
+    }
+});
+
