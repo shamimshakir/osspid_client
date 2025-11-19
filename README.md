@@ -1,6 +1,6 @@
 # OSSPID Client
 
-A PHP-based OAuth2/OpenID Connect client application that demonstrates authentication integration with both Keycloak and direct OSSPID server.
+A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrates authentication integration with both Keycloak and direct OSSPID server.
 
 ## Features
 
@@ -9,6 +9,7 @@ A PHP-based OAuth2/OpenID Connect client application that demonstrates authentic
   - OSSPID login via Keycloak
   - BanglaBizz login via Keycloak
   - HelloApp login via Keycloak
+  - UATID login via Keycloak
   - All providers view via Keycloak
 
 - ✨ **Security Features**:
@@ -24,9 +25,12 @@ A PHP-based OAuth2/OpenID Connect client application that demonstrates authentic
 
 ## Technology Stack
 
-- **Framework**: [Slim Framework 4](https://www.slimframework.com/)
+- **Runtime**: Node.js
+- **Framework**: [Express.js](https://expressjs.com/)
 - **OAuth2**: OAuth2/OpenID Connect
-- **PHP Version**: 7.4+
+- **HTTP Client**: Axios
+- **Session Management**: express-session
+- **Node Version**: 14.x or higher
 
 ## Installation
 
@@ -36,41 +40,51 @@ git clone https://github.com/shamimshakir/osspid_client.git
 cd osspid_client
 ```
 
-2. Install dependencies using Composer:
+2. Install dependencies using npm:
 ```bash
-composer install
+npm install
 ```
 
-3. Configure your settings in `src/Routes/AuthRoutes.php`:
-   - Update Keycloak configuration (KHOST, KRealms, etc.)
-   - Update Direct OSSPID configuration (OSSPID_HOST, OSSPID_CLIENT_ID, etc.)
+3. Configure your settings in `config.js`:
+   - Update Keycloak configuration (host, realm, clientId, clientSecret)
+   - Update Direct OSSPID configuration (host, clientId, clientSecret)
+   - Update UATID configuration
+   - Update session secret
 
 ## Running the Application
 
-Start the built-in PHP server:
+Start the application in production mode:
 ```bash
-composer serve
+npm start
 ```
 
-Or manually:
+Or in development mode with auto-reload:
 ```bash
-php -S 192.168.30.56:8010 -t public/
+npm run dev
 ```
 
 The application will be available at: `http://192.168.30.56:8010/`
 
 ## Configuration
 
+Edit `config.js` to configure the application:
+
 ### Keycloak Configuration
 - **Host**: `http://192.168.30.56:8880`
 - **Realm**: `myrealm`
+- **Client ID**: `ss-client`
 - **Callback URL**: `http://192.168.30.56:8010/keycloak/callback`
 
 ### Direct OSSPID Configuration
 - **Host**: `http://192.168.30.56:8050`
-- **Client Name**: `osspid-client-direct`
+- **Client ID**: `2520c78a5763a4ca5154224a38da6faf2cbfd4ec`
 - **Callback URL**: `http://192.168.30.56:8010/osspid-direct/callback`
 - **Scopes**: `openid profile email`
+
+### UATID Configuration
+- **Realm**: `uat-id-realm`
+- **Client ID**: `uat-id-client`
+- **Callback URL**: `http://192.168.30.56:8010/uatid/callback`
 
 ## Routes
 
@@ -79,24 +93,30 @@ The application will be available at: `http://192.168.30.56:8010/`
 - `/osspid-login` - OSSPID via Keycloak
 - `/banglabiz-login` - BanglaBizz via Keycloak
 - `/helloapp-login` - HelloApp via Keycloak
+- `/uatid-login` - UATID via Keycloak
 - `/all-login` - View all available providers
 - `/logout` - Logout from current session
 
 ### Callback Routes
 - `/osspid-direct/callback` - Direct OSSPID callback handler
 - `/keycloak/callback` - Keycloak callback handler
+- `/uatid/callback` - UATID callback handler
+
+### API Routes
+- `/api/status` - API status endpoint
+- `/check-uatid-config` - Check UATID OpenID configuration
 
 ## Project Structure
 
 ```
 osspid_client/
-├── public/
-│   └── index.php           # Application entry point
+├── index.js                # Application entry point
+├── config.js               # Configuration settings
 ├── src/
-│   └── Routes/
-│       ├── AuthRoutes.php  # Authentication routes
-│       └── WebRoutes.php   # Web/UI routes
-├── composer.json           # Dependencies
+│   └── routes/
+│       ├── authRoutes.js   # Authentication routes
+│       └── webRoutes.js    # Web/UI routes
+├── package.json            # Dependencies and scripts
 └── README.md              # This file
 ```
 

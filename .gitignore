@@ -1,4 +1,7 @@
-# Composer dependencies
+# Node.js dependencies
+node_modules/
+
+# Composer dependencies (legacy PHP)
 /vendor/
 
 # IDE and editor files
@@ -6,6 +9,9 @@
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.swp
+*.swo
+*~
 
 # OS files
 .DS_Store
@@ -14,10 +20,26 @@ Thumbs.db
 # Environment files
 .env
 .env.local
+.env.*.local
 
 # Log files
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Cache files
+# Cache and temp files
 cache/
 temp/
+sessions/
+
+# Build files
+dist/
+build/
+
+# PHP files (legacy - not needed for Node.js)
+composer.json
+composer.lock
+public/index.php
+src/Routes/*.php
