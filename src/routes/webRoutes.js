@@ -253,10 +253,8 @@ router.get('/', (req, res) => {
             <a href="/osspid-direct-login" class="btn btn-direct">🚀 Direct OSSPID Login</a>
             <div class="divider"></div>
             <a href="/osspid-login" class="btn btn-primary">Login with OSSPID (via Keycloak)</a>
-            <a href="/banglabiz-login" class="btn btn-secondary">Login with BanglaBizz</a>
-            <a href="/helloapp-login" class="btn btn-danger">Login with HelloApp</a>
             <a href="/uatid-login" class="btn btn-primary">Login with UATID</a>
-            <a href="/all-login" class="btn btn-success">All Login Options</a>
+            <a href="/all-login" class="btn btn-success">Keycloak IDP Login</a>
         </div>`;
   } else {
     const preferred_username = escapeHtml(user.preferred_username || user.sub || 'User');

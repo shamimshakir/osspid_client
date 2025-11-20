@@ -45,11 +45,21 @@ cd osspid_client
 npm install
 ```
 
-3. Configure your settings in `config.js`:
-   - Update Keycloak configuration (host, realm, clientId, clientSecret)
-   - Update Direct OSSPID configuration (host, clientId, clientSecret)
-   - Update UATID configuration
-   - Update session secret
+3. Configure environment variables:
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env file with your configuration
+nano .env  # or use your preferred editor
+```
+
+4. Update the `.env` file with your actual configuration values:
+   - Server host and port
+   - Keycloak credentials and endpoints
+   - Direct OSSPID credentials
+   - UATID credentials
+   - Session secret (important for production!)
 
 ## Running the Application
 
@@ -63,28 +73,41 @@ Or in development mode with auto-reload:
 npm run dev
 ```
 
-The application will be available at: `http://192.168.30.56:8010/`
+The application will be available at: `http://[SERVER_HOST]:[SERVER_PORT]/`
 
 ## Configuration
 
-Edit `config.js` to configure the application:
+The application uses environment variables for configuration. Copy `.env.example` to `.env` and update the values:
 
-### Keycloak Configuration
-- **Host**: `http://192.168.30.56:8880`
-- **Realm**: `myrealm`
-- **Client ID**: `ss-client`
-- **Callback URL**: `http://192.168.30.56:8010/keycloak/callback`
+### Environment Variables
 
-### Direct OSSPID Configuration
-- **Host**: `http://192.168.30.56:8050`
-- **Client ID**: `2520c78a5763a4ca5154224a38da6faf2cbfd4ec`
-- **Callback URL**: `http://192.168.30.56:8010/osspid-direct/callback`
-- **Scopes**: `openid profile email`
+#### Server Configuration
+- `SERVER_HOST` - Server hostname (e.g., `192.168.0.108`)
+- `SERVER_PORT` - Server port (e.g., `8010`)
+- `APP_URL` - Full application URL (e.g., `http://192.168.0.108:8010`)
 
-### UATID Configuration
-- **Realm**: `uat-id-realm`
-- **Client ID**: `uat-id-client`
-- **Callback URL**: `http://192.168.30.56:8010/uatid/callback`
+#### Keycloak Configuration
+- `KEYCLOAK_HOST` - Keycloak server URL
+- `KEYCLOAK_REALM` - Keycloak realm name
+- `KEYCLOAK_CLIENT_ID` - Client ID
+- `KEYCLOAK_CLIENT_SECRET` - Client secret
+- `KEYCLOAK_IDP` - Default identity provider
+
+#### Direct OSSPID Configuration
+- `OSSPID_HOST` - OSSPID server URL
+- `OSSPID_CLIENT_ID` - OSSPID client ID
+- `OSSPID_CLIENT_SECRET` - OSSPID client secret
+
+#### UATID Configuration
+- `UATID_HOST` - UATID Keycloak host (e.g., `https://idpv2.oss.net.bd`)
+- `UATID_REALM` - UATID realm name
+- `UATID_CLIENT_ID` - UATID client ID
+- `UATID_CLIENT_SECRET` - UATID client secret
+- `UATID_IDP_HINT` - Identity provider hint
+
+#### Session Configuration
+- `SESSION_SECRET` - Secret key for session encryption (change in production!)
+- `SESSION_SECURE` - Set to `true` for HTTPS (production)
 
 ## Routes
 
@@ -111,7 +134,9 @@ Edit `config.js` to configure the application:
 ```
 osspid_client/
 ├── index.js                # Application entry point
-├── config.js               # Configuration settings
+├── config.js               # Configuration loader (reads from .env)
+├── .env                    # Environment variables (not in git)
+├── .env.example            # Example environment variables
 ├── src/
 │   └── routes/
 │       ├── authRoutes.js   # Authentication routes
@@ -119,6 +144,13 @@ osspid_client/
 ├── package.json            # Dependencies and scripts
 └── README.md              # This file
 ```
+
+## Security Notes
+
+- Never commit `.env` file to version control
+- Always change `SESSION_SECRET` in production
+- Use HTTPS in production and set `SESSION_SECURE=true`
+- Keep client secrets confidential
 
 ## License
 

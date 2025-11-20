@@ -39,7 +39,7 @@ function buildAuthUrl(idpHint = null) {
  * @returns {string} Authorization URL
  */
 function buildUatidAuthUrl() {
-  const url = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/auth`;
+  const url = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/auth`;
   
   const credentials = {
     response_type: 'code',
@@ -71,7 +71,7 @@ function buildDirectOsspidAuthUrl(session) {
     client_id: config.osspid.clientId,
     redirect_uri: config.osspid.redirectUrl,
     response_type: 'code',
-    scope: 'openid profile email',
+    scope: 'openid',
     state: state,
   };
   
@@ -106,24 +106,6 @@ router.get('/osspid-login', (req, res) => {
 });
 
 /**
- * BanglaBizz Login Route
- * Redirects user to Keycloak authentication page with BanglaBizz as IDP
- */
-router.get('/banglabiz-login', (req, res) => {
-  const authorizeUrl = buildAuthUrl('banglabizz');
-  res.redirect(authorizeUrl);
-});
-
-/**
- * HelloApp Login Route
- * Redirects user to Keycloak authentication page with HelloApp as IDP
- */
-router.get('/helloapp-login', (req, res) => {
-  const authorizeUrl = buildAuthUrl('helloapp');
-  res.redirect(authorizeUrl);
-});
-
-/**
  * UATID Login Route
  * Redirects user to UATID Keycloak realm (separate realm with its own client)
  */
@@ -153,12 +135,41 @@ router.get('/osspid-direct-login', (req, res) => {
 /**
  * Logout Route
  * Destroys local session, logs out from Keycloak SSO or direct OSSPID, and redirects back to login page
+ * For UATID, performs a two-step logout: first from Keycloak, then from the IDP
  */
 router.get('/logout', (req, res) => {
   const idToken = req.session.id_token;
   const loginType = req.session.login_type || 'keycloak';
   
-  // Destroy session
+  // For UATID, we need to logout from both Keycloak and IDP
+  // Store the login type in a query parameter before destroying session
+  if (loginType === 'uatid') {
+    // Store necessary info before destroying session
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+      }
+    });
+    
+    // Build UATID Keycloak logout URL that will redirect to IDP logout
+    const keycloakLogoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/logout`;
+    
+    // The post_logout_redirect_uri will be our IDP logout endpoint
+    const idpLogoutCallback = `${config.server.appUrl}/logout-idp`;
+    
+    const params = {
+      client_id: config.uatid.clientId,
+      post_logout_redirect_uri: idpLogoutCallback,
+    };
+    
+    if (idToken) {
+      params.id_token_hint = idToken;
+    }
+    
+    return res.redirect(`${keycloakLogoutUrl}?${querystring.stringify(params)}`);
+  }
+  
+  // Destroy session for non-UATID logins
   req.session.destroy((err) => {
     if (err) {
       console.error('Session destruction error:', err);
@@ -168,17 +179,13 @@ router.get('/logout', (req, res) => {
   // Build logout URL based on login type
   let logoutUrl;
   let params = {
-    post_logout_redirect_uri: `http://${config.server.host}:${config.server.port}/`,
+    post_logout_redirect_uri: `${config.server.appUrl}/`,
   };
   
   if (loginType === 'osspid_direct') {
     // Direct OSSPID logout
     logoutUrl = `${config.osspid.host}/osspid-client/openid/v2/logout`;
     params.client_id = config.osspid.clientId;
-  } else if (loginType === 'uatid') {
-    // UATID Keycloak realm logout
-    logoutUrl = `${config.keycloak.host}/realms/${config.uatid.realm}/protocol/openid-connect/logout`;
-    params.client_id = config.uatid.clientId;
   } else {
     // Default Keycloak logout
     logoutUrl = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/logout`;
@@ -190,6 +197,25 @@ router.get('/logout', (req, res) => {
   }
   
   res.redirect(`${logoutUrl}?${querystring.stringify(params)}`);
+});
+
+/**
+ * IDP Logout Callback Route
+ * Handles the second step of UATID logout - logs out from the underlying IDP
+ * This route is called after Keycloak logout completes
+ */
+router.get('/logout-idp', (req, res) => {
+  // Build IDP logout URL (UATID IDP)
+  // The IDP hint tells us which IDP was used - for UATID it's 'uatid'
+  const idpLogoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/broker/${config.uatid.idpHint}/logout`;
+  
+  const finalRedirectUri = `${config.server.appUrl}/`;
+  
+  const params = {
+    redirect_uri: finalRedirectUri,
+  };
+  
+  res.redirect(`${idpLogoutUrl}?${querystring.stringify(params)}`);
 });
 
 /**
@@ -347,7 +373,7 @@ router.get('/uatid/callback', async (req, res) => {
   
   try {
     // Exchange authorization code for access token using UATID realm
-    const tokenEndpoint = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/token`;
+    const tokenEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/token`;
     
     const postData = {
       grant_type: 'authorization_code',
@@ -375,7 +401,7 @@ router.get('/uatid/callback', async (req, res) => {
     req.session.id_token = id_token;
     
     // Fetch user information
-    const userinfoEndpoint = `https://idpv2.oss.net.bd/realms/osspid/protocol/openid-connect/userinfo`;
+    const userinfoEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/userinfo`;
     
     const userinfoResponse = await axios.get(userinfoEndpoint, {
       headers: {
