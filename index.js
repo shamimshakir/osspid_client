@@ -3,6 +3,9 @@
  * Node.js/Express application for OAuth2/OpenID Connect authentication
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const session = require('express-session');
 const config = require('./config');
@@ -54,8 +57,10 @@ app.use((err, req, res, next) => {
 const { host, port } = config.server;
 app.listen(port, host, () => {
   console.log(`🚀 OSSPID Client server running at http://${host}:${port}/`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📝 Available routes:`);
   console.log(`   - http://${host}:${port}/ (Home)`);
+  console.log(`   - http://${host}:${port}/health (Health Check)`);
   console.log(`   - http://${host}:${port}/osspid-direct-login (Direct OSSPID)`);
   console.log(`   - http://${host}:${port}/osspid-login (OSSPID via Keycloak)`);
   console.log(`   - http://${host}:${port}/uatid-login (UATID)`);

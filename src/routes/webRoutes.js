@@ -4,8 +4,6 @@
  */
 
 const express = require('express');
-const axios = require('axios');
-const config = require('../../config');
 
 const router = express.Router();
 
@@ -299,6 +297,17 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * Health Check Endpoint (for Docker)
+ */
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+/**
  * API Status Endpoint
  * Returns JSON response with API status
  */
@@ -312,144 +321,6 @@ router.get('/api/status', (req, res) => {
   res.json(data);
 });
 
-/**
- * UAT-ID Configuration Check Route
- * Fetches and displays UAT-ID's OpenID Connect configuration
- */
-router.get('/check-uatid-config', async (req, res) => {
-  // Try multiple possible well-known URLs
-  const possibleUrls = [
-    'https://uat-id.oss.net.bd/.well-known/openid-configuration',
-    'https://uat-id.oss.net.bd/osspid-client/.well-known/openid-configuration',
-    'https://uat-id.oss.net.bd/osspid-client/openid/.well-known/openid-configuration',
-    'https://uat-id.oss.net.bd/osspid-client/openid/v2/.well-known/openid-configuration',
-  ];
-  
-  let successConfig = null;
-  let successUrl = null;
-  const attempts = [];
-  
-  for (const wellKnownUrl of possibleUrls) {
-    try {
-      const response = await axios.get(wellKnownUrl, {
-        timeout: 5000,
-        validateStatus: () => true,
-        httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
-      });
-      
-      attempts.push({
-        url: wellKnownUrl,
-        status: response.status,
-        error: null
-      });
-      
-      if (response.status === 200 && response.data && response.data.issuer) {
-        successConfig = response.data;
-        successUrl = wellKnownUrl;
-        break;
-      }
-    } catch (error) {
-      attempts.push({
-        url: wellKnownUrl,
-        status: error.response?.status || 0,
-        error: error.message
-      });
-    }
-  }
-  
-  let html = `<!DOCTYPE html>
-<html>
-<head>
-    <title>UAT-ID Configuration Check</title>
-    <style>
-        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 20px; border-radius: 8px; max-width: 1200px; margin: 0 auto; }
-        h1 { color: #333; }
-        pre { background: #f8f8f8; padding: 15px; border-radius: 4px; overflow-x: auto; }
-        .error { color: red; background: #ffebee; padding: 10px; border-radius: 4px; margin: 10px 0; }
-        .success { color: green; }
-        .info { background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0; }
-        .warning { background: #fff3e0; padding: 10px; border-radius: 4px; margin: 10px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #f5f5f5; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>UAT-ID OpenID Connect Configuration</h1>`;
-  
-  if (successUrl) {
-    html += `<p><strong>✓ Found configuration at:</strong> ${escapeHtml(successUrl)}</p>`;
-  } else {
-    html += '<h3>Attempted URLs:</h3><table><tr><th>URL</th><th>Status</th></tr>';
-    for (const attempt of attempts) {
-      html += `<tr><td>${escapeHtml(attempt.url)}</td><td>${attempt.status}</td></tr>`;
-    }
-    html += '</table>';
-  }
-  
-  if (successConfig) {
-    html += '<div class="success"><strong>✓ Successfully fetched configuration</strong></div>';
-    
-    if (successConfig.scopes_supported) {
-      html += '<div class="info"><h3>Supported Scopes:</h3><ul>';
-      for (const scope of successConfig.scopes_supported) {
-        html += `<li>${escapeHtml(scope)}</li>`;
-      }
-      html += `</ul><p><strong>Recommendation:</strong> Use these scopes in Keycloak: <code>${escapeHtml(successConfig.scopes_supported.join(' '))}</code></p></div>`;
-    }
-    
-    html += `<h3>Full Configuration:</h3><pre>${JSON.stringify(successConfig, null, 2)}</pre>`;
-  } else {
-    html += `<div class="error"><strong>✗ Could not find OpenID configuration</strong><br>
-        None of the standard paths returned a valid configuration.</div>
-        
-        <div class="warning"><h3>⚠️ Workaround Solution</h3>
-        <p>Since UAT-ID doesn't have a discoverable well-known configuration, the scope issue is likely due to Keycloak's default settings.</p>
-        <h4>Try this in Keycloak:</h4>
-        <ol>
-            <li>Go to your UAT-ID identity provider settings in Keycloak</li>
-            <li>In the Keycloak admin, go to <strong>Configure → Client scopes</strong></li>
-            <li>Find any client scopes that have <code>offline_access</code></li>
-            <li>Or, try setting the UAT-ID provider to use <strong>prompt=none</strong> in advanced settings</li>
-            <li>Most commonly: The default mapper configuration sends scopes that UAT-ID doesn't support</li>
-        </ol>
-        <h4>Quick Fix - Try these scopes in Keycloak:</h4>
-        <ul>
-            <li><code>openid</code> - Only the basic scope</li>
-            <li><code>openid profile</code> - With profile information</li>
-            <li><code>openid profile email</code> - Full standard scopes</li>
-        </ul>
-        <p><strong>Remove these if present:</strong> <code>offline_access</code>, <code>microprofile-jwt</code>, or any custom scopes</p>
-        </div>
-        
-        <div class="info"><h3>Manual URLs to try:</h3><ul>`;
-    
-    for (const url of possibleUrls) {
-      html += `<li><a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></li>`;
-    }
-    html += '</ul></div>';
-  }
-  
-  html += `<p><a href="/">← Back to Home</a></p>
-    </div>
-</body>
-</html>`;
-  
-  res.send(html);
-});
 
-/**
- * Example POST Route
- * Demonstrates handling POST data
- * @deprecated This is a demo route and should be removed in production
- */
-router.post('/hola', (req, res) => {
-  const { name = 'Guest', age = 'unknown' } = req.body;
-  
-  const message = `Hola, ${escapeHtml(name)}! You are ${escapeHtml(age)} years old.`;
-  res.send(message);
-});
 
 module.exports = router;

@@ -1,16 +1,20 @@
-# OSSPID Client
+# 🔐 OSSPID Client
 
-A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrates authentication integration with both Keycloak and direct OSSPID server.
+A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrates authentication integration with Keycloak and OSSPID server. **Runs exclusively with Docker for consistent deployment.**
 
-## Features
+## ✨ Features
 
 - 🔐 **Multiple Authentication Methods**:
   - Direct OSSPID login (bypassing Keycloak)
   - OSSPID login via Keycloak
-  - BanglaBizz login via Keycloak
-  - HelloApp login via Keycloak
   - UATID login via Keycloak
   - All providers view via Keycloak
+
+- 🐳 **Docker-Ready**:
+  - Production-optimized Docker setup
+  - Health checks built-in
+  - Easy deployment and scaling
+  - Consistent environment across all platforms
 
 - ✨ **Security Features**:
   - OAuth2 Authorization Code Flow
@@ -23,139 +27,224 @@ A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrat
   - Beautiful gradient buttons with hover effects
   - Clean user dashboard
 
-## Technology Stack
+## 🛠️ Technology Stack
 
-- **Runtime**: Node.js
-- **Framework**: [Express.js](https://expressjs.com/)
+- **Runtime**: Node.js 18
+- **Framework**: Express.js
 - **OAuth2**: OAuth2/OpenID Connect
 - **HTTP Client**: Axios
 - **Session Management**: express-session
-- **Node Version**: 14.x or higher
+- **Containerization**: Docker & Docker Compose
 
-## Installation
+## 🚀 Quick Start (Docker)
 
-1. Clone the repository:
+### Prerequisites
+
+- Docker Desktop installed ([Download](https://www.docker.com/products/docker-desktop/))
+- Docker Compose (included with Docker Desktop)
+
+### Installation & Run
+
 ```bash
+# 1. Clone the repository
 git clone https://github.com/shamimshakir/osspid_client.git
 cd osspid_client
-```
 
-2. Install dependencies using npm:
-```bash
-npm install
-```
-
-3. Configure environment variables:
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit .env file with your configuration
-nano .env  # or use your preferred editor
-```
-
-4. Update the `.env` file with your actual configuration values:
-   - Server host and port
-   - Keycloak credentials and endpoints
-   - Direct OSSPID credentials
-   - UATID credentials
-   - Session secret (important for production!)
-
-## Running the Application
-
-Start the application in production mode:
-```bash
+# 2. Start the application with Docker
 npm start
+# or
+docker-compose up -d
+
+# 3. View logs
+npm run logs
+# or
+docker-compose logs -f
+
+# 4. Access the application
+# Open browser: http://localhost:3000
 ```
 
-Or in development mode with auto-reload:
+That's it! The application is now running on **http://localhost:3000** 🎉
+
+### Quick Commands
+
 ```bash
-npm run dev
+npm start          # Start application
+npm stop           # Stop application
+npm run logs       # View logs
+npm run restart    # Restart application
+npm run rebuild    # Rebuild and restart
+npm run status     # Check container status
+npm run shell      # Open container shell
 ```
 
-The application will be available at: `http://[SERVER_HOST]:[SERVER_PORT]/`
+## ⚙️ Configuration
 
-## Configuration
+Configuration is managed through environment variables in `docker-compose.yml`. The application comes pre-configured with default values.
 
-The application uses environment variables for configuration. Copy `.env.example` to `.env` and update the values:
+### Default Configuration
 
-### Environment Variables
+- **Port**: 3000
+- **Host**: 0.0.0.0 (accessible from all interfaces)
+- **App URL**: http://localhost:3000
 
-#### Server Configuration
-- `SERVER_HOST` - Server hostname (e.g., `192.168.0.108`)
-- `SERVER_PORT` - Server port (e.g., `8010`)
-- `APP_URL` - Full application URL (e.g., `http://192.168.0.108:8010`)
+### Customizing Configuration
 
-#### Keycloak Configuration
-- `KEYCLOAK_HOST` - Keycloak server URL
-- `KEYCLOAK_REALM` - Keycloak realm name
-- `KEYCLOAK_CLIENT_ID` - Client ID
-- `KEYCLOAK_CLIENT_SECRET` - Client secret
-- `KEYCLOAK_IDP` - Default identity provider
+Edit `docker-compose.yml` to modify environment variables:
 
-#### Direct OSSPID Configuration
-- `OSSPID_HOST` - OSSPID server URL
-- `OSSPID_CLIENT_ID` - OSSPID client ID
-- `OSSPID_CLIENT_SECRET` - OSSPID client secret
+```yaml
+environment:
+  # Server Configuration
+  - SERVER_PORT=3000
+  - APP_URL=http://localhost:3000
+  
+  # Keycloak Configuration
+  - KEYCLOAK_HOST=http://192.168.0.108:8880
+  - KEYCLOAK_REALM=myrealm
+  - KEYCLOAK_CLIENT_ID=ss-client
+  - KEYCLOAK_CLIENT_SECRET=your-secret
+  
+  # OSSPID Configuration
+  - OSSPID_HOST=http://192.168.0.108:8050
+  - OSSPID_CLIENT_ID=your-client-id
+  - OSSPID_CLIENT_SECRET=your-secret
+  
+  # UATID Configuration
+  - UATID_HOST=https://idpv2.oss.net.bd
+  - UATID_REALM=osspid
+  - UATID_CLIENT_ID=id-client-local
+  - UATID_CLIENT_SECRET=your-secret
+  
+  # Session Configuration
+  - SESSION_SECRET=change-this-in-production
+```
 
-#### UATID Configuration
-- `UATID_HOST` - UATID Keycloak host (e.g., `https://idpv2.oss.net.bd`)
-- `UATID_REALM` - UATID realm name
-- `UATID_CLIENT_ID` - UATID client ID
-- `UATID_CLIENT_SECRET` - UATID client secret
-- `UATID_IDP_HINT` - Identity provider hint
+After editing, restart the application:
+```bash
+npm run rebuild
+```
 
-#### Session Configuration
-- `SESSION_SECRET` - Secret key for session encryption (change in production!)
-- `SESSION_SECURE` - Set to `true` for HTTPS (production)
+### Environment Variables Reference
 
-## Routes
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | Application port | `3000` |
+| `SERVER_HOST` | Bind address | `0.0.0.0` |
+| `APP_URL` | External URL | `http://localhost:3000` |
+| `KEYCLOAK_HOST` | Keycloak server URL | `http://192.168.0.108:8880` |
+| `KEYCLOAK_REALM` | Keycloak realm | `myrealm` |
+| `KEYCLOAK_CLIENT_ID` | Keycloak client ID | `ss-client` |
+| `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret | - |
+| `OSSPID_HOST` | OSSPID server URL | `http://192.168.0.108:8050` |
+| `OSSPID_CLIENT_ID` | OSSPID client ID | - |
+| `OSSPID_CLIENT_SECRET` | OSSPID client secret | - |
+| `UATID_HOST` | UATID server URL | `https://idpv2.oss.net.bd` |
+| `UATID_REALM` | UATID realm | `osspid` |
+| `UATID_CLIENT_ID` | UATID client ID | `id-client-local` |
+| `UATID_CLIENT_SECRET` | UATID client secret | - |
+| `SESSION_SECRET` | Session encryption key | ⚠️ Change in production! |
+
+## 🌐 Available Routes
+
+### Home & Health
+- **`/`** - Home page with login options
+- **`/health`** - Health check endpoint (for Docker)
+- **`/api/status`** - API status endpoint
 
 ### Authentication Routes
-- `/osspid-direct-login` - Direct OSSPID authentication
-- `/osspid-login` - OSSPID via Keycloak
-- `/banglabiz-login` - BanglaBizz via Keycloak
-- `/helloapp-login` - HelloApp via Keycloak
-- `/uatid-login` - UATID via Keycloak
-- `/all-login` - View all available providers
-- `/logout` - Logout from current session
+- **`/osspid-direct-login`** - Direct OSSPID authentication
+- **`/osspid-login`** - OSSPID via Keycloak
+- **`/uatid-login`** - UATID via Keycloak
+- **`/all-login`** - View all available providers
+- **`/logout`** - Logout from current session
 
 ### Callback Routes
-- `/osspid-direct/callback` - Direct OSSPID callback handler
-- `/keycloak/callback` - Keycloak callback handler
-- `/uatid/callback` - UATID callback handler
+- **`/osspid-direct/callback`** - Direct OSSPID callback handler
+- **`/keycloak/callback`** - Keycloak callback handler
+- **`/uatid/callback`** - UATID callback handler
 
-### API Routes
-- `/api/status` - API status endpoint
-- `/check-uatid-config` - Check UATID OpenID configuration
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 osspid_client/
-├── index.js                # Application entry point
-├── config.js               # Configuration loader (reads from .env)
-├── .env                    # Environment variables (not in git)
-├── .env.example            # Example environment variables
+├── index.js                      # Application entry point
+├── config.js                     # Configuration (environment variables)
+├── Dockerfile                    # Docker image definition
+├── docker-compose.yml            # Docker orchestration
+├── .dockerignore                 # Docker build exclusions
+├── package.json                  # Dependencies and npm scripts
 ├── src/
-│   └── routes/
-│       ├── authRoutes.js   # Authentication routes
-│       └── webRoutes.js    # Web/UI routes
-├── package.json            # Dependencies and scripts
-└── README.md              # This file
+│   ├── routes/
+│   │   ├── authRoutes.js        # Authentication routes
+│   │   └── webRoutes.js         # Web/UI routes
+│   ├── services/
+│   │   ├── authUrlBuilder.js    # OAuth URL construction
+│   │   └── tokenService.js      # Token exchange & user info
+│   ├── middleware/
+│   │   └── errorHandler.js      # Error handling
+│   └── utils/
+│       ├── jwtUtils.js          # JWT decoding
+│       └── sessionHelper.js     # Session management
+├── README.md                     # This file
+├── README-DOCKER.md              # Docker step-by-step guide
+└── DOCKER.md                     # Complete Docker documentation
 ```
 
-## Security Notes
+## 📚 Documentation
 
-- Never commit `.env` file to version control
-- Always change `SESSION_SECRET` in production
-- Use HTTPS in production and set `SESSION_SECURE=true`
-- Keep client secrets confidential
+- **[README-DOCKER.md](README-DOCKER.md)** - Step-by-step Docker deployment guide
+- **[DOCKER.md](DOCKER.md)** - Complete Docker reference and troubleshooting
 
-## License
+## 🔒 Security Notes
+
+- ⚠️ **Always change `SESSION_SECRET`** in production
+- 🔐 Use HTTPS in production and set `SESSION_SECURE=true`
+- 🔑 Keep client secrets confidential
+- 🚫 Never expose sensitive environment variables
+- 🔄 Rotate secrets regularly
+
+## 🐛 Troubleshooting
+
+### Container won't start
+```bash
+npm run logs
+```
+
+### Port 3000 already in use
+```bash
+# Stop existing containers
+docker ps
+docker stop <container-id>
+
+# Or change port in docker-compose.yml
+ports:
+  - "8080:3000"  # Use 8080 on host
+```
+
+### Rebuild after code changes
+```bash
+npm run rebuild
+```
+
+### Access container shell
+```bash
+npm run shell
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
 
 MIT License
 
-## Author
+## 👤 Author
 
-Shamim Shakir
+**Shamim Shakir**
+- GitHub: [@shamimshakir](https://github.com/shamimshakir)
+- Repository: [osspid_client](https://github.com/shamimshakir/osspid_client)
+
+---
+
+**Made with ❤️ using Node.js, Express, and Docker**

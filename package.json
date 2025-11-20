@@ -4,8 +4,14 @@
   "description": "OSSPID demo client project which will interact with Keycloak and OSSPID adapter",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "logs": "docker-compose logs -f",
+    "restart": "docker-compose restart",
+    "build": "docker-compose build",
+    "rebuild": "docker-compose down && docker-compose up -d --build",
+    "status": "docker ps --filter name=osspid-client",
+    "shell": "docker exec -it osspid-client sh"
   },
   "author": "shamimshakir",
   "license": "MIT",
@@ -13,9 +19,7 @@
     "axios": "^1.6.2",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "jsonwebtoken": "^9.0.2",
-    "querystring": "^0.2.1"
+    "express-session": "^1.17.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
