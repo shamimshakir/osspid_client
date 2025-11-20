@@ -4,424 +4,231 @@
  */
 
 const express = require('express');
-const axios = require('axios');
-const querystring = require('querystring');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const config = require('../../config');
+const AuthUrlBuilder = require('../services/authUrlBuilder');
+const TokenService = require('../services/tokenService');
+const { storeAuthData, clearAuthData, verifyState } = require('../utils/sessionHelper');
+const { handleOAuthError, validateCallbackCode } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-/**
- * Build authorization URL for OAuth2 flow with Keycloak
- * @param {string|null} idpHint - Identity provider hint (optional)
- * @returns {string} Authorization URL
- */
-function buildAuthUrl(idpHint = null) {
-  const url = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/auth`;
-  
-  const credentials = {
-    response_type: 'code',
-    scope: 'openid email',
-    client_id: config.keycloak.clientId,
-    redirect_uri: config.keycloak.redirectUrl,
-  };
-  
-  if (idpHint) {
-    credentials.kc_idp_hint = idpHint;
-  }
-  
-  return `${url}?${querystring.stringify(credentials)}`;
-}
-
-/**
- * Build authorization URL for UATID (separate Keycloak realm)
- * @returns {string} Authorization URL
- */
-function buildUatidAuthUrl() {
-  const url = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/auth`;
-  
-  const credentials = {
-    response_type: 'code',
-    scope: 'openid profile email',
-    client_id: config.uatid.clientId,
-    redirect_uri: config.uatid.redirectUrl,
-  };
-  
-  if (config.uatid.idpHint) {
-    credentials.kc_idp_hint = config.uatid.idpHint;
-  }
-  
-  return `${url}?${querystring.stringify(credentials)}`;
-}
-
-/**
- * Build authorization URL for direct OSSPID OAuth2 flow
- * @param {object} session - Express session object
- * @returns {string} Authorization URL
- */
-function buildDirectOsspidAuthUrl(session) {
-  // Generate and store state parameter for CSRF protection
-  const state = crypto.randomBytes(16).toString('hex');
-  session.oauth2_state = state;
-  
-  const url = `${config.osspid.host}/osspid-client/openid/v2/authorize`;
-  
-  const credentials = {
-    client_id: config.osspid.clientId,
-    redirect_uri: config.osspid.redirectUrl,
-    response_type: 'code',
-    scope: 'openid',
-    state: state,
-  };
-  
-  return `${url}?${querystring.stringify(credentials)}`;
-}
-
-/**
- * Decode JWT token without verification (for ID token payload extraction)
- * @param {string} token - JWT token
- * @returns {object|null} Decoded payload or null
- */
-function decodeJWT(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    
-    const payload = Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
-    return JSON.parse(payload);
-  } catch (err) {
-    console.error('Error decoding JWT:', err);
-    return null;
-  }
-}
+// ==================== LOGIN ROUTES ====================
 
 /**
  * OSSPID Login Route
  * Redirects user to Keycloak authentication page with OSSPID as IDP
  */
 router.get('/osspid-login', (req, res) => {
-  const authorizeUrl = buildAuthUrl(config.keycloak.idp);
+  const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl(config.keycloak.idp);
   res.redirect(authorizeUrl);
 });
 
 /**
  * UATID Login Route
- * Redirects user to UATID Keycloak realm (separate realm with its own client)
+ * Redirects user to UATID Keycloak realm
  */
 router.get('/uatid-login', (req, res) => {
-  const authorizeUrl = buildUatidAuthUrl();
+  const authorizeUrl = AuthUrlBuilder.buildUatidAuthUrl();
   res.redirect(authorizeUrl);
 });
 
 /**
  * All Login Options Route
- * Redirects user to Keycloak authentication page showing all available IDPs
+ * Redirects user to Keycloak showing all available IDPs
  */
 router.get('/all-login', (req, res) => {
-  const authorizeUrl = buildAuthUrl();
+  const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl();
   res.redirect(authorizeUrl);
 });
 
 /**
  * Direct OSSPID Login Route
- * Redirects user directly to OSSPID authentication page (bypassing Keycloak)
+ * Redirects user directly to OSSPID (bypassing Keycloak)
  */
 router.get('/osspid-direct-login', (req, res) => {
-  const authorizeUrl = buildDirectOsspidAuthUrl(req.session);
+  const authorizeUrl = AuthUrlBuilder.buildDirectOsspidAuthUrl(req.session);
   res.redirect(authorizeUrl);
 });
 
+// ==================== LOGOUT ROUTES ====================
+
 /**
  * Logout Route
- * Destroys local session, logs out from Keycloak SSO or direct OSSPID, and redirects back to login page
- * For UATID, performs a two-step logout: first from Keycloak, then from the IDP
+ * Destroys local session and initiates SSO logout
  */
-router.get('/logout', (req, res) => {
+router.get('/logout', async (req, res) => {
   const idToken = req.session.id_token;
   const loginType = req.session.login_type || 'keycloak';
   
-  // For UATID, we need to logout from both Keycloak and IDP
-  // Store the login type in a query parameter before destroying session
+  // Special handling for UATID two-step logout
   if (loginType === 'uatid') {
-    // Store necessary info before destroying session
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Session destruction error:', err);
-      }
-    });
-    
-    // Build UATID Keycloak logout URL that will redirect to IDP logout
-    const keycloakLogoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/logout`;
-    
-    // The post_logout_redirect_uri will be our IDP logout endpoint
-    const idpLogoutCallback = `${config.server.appUrl}/logout-idp`;
-    
-    const params = {
-      client_id: config.uatid.clientId,
-      post_logout_redirect_uri: idpLogoutCallback,
-    };
-    
-    if (idToken) {
-      params.id_token_hint = idToken;
-    }
-    
-    return res.redirect(`${keycloakLogoutUrl}?${querystring.stringify(params)}`);
-  }
-  
-  // Destroy session for non-UATID logins
-  req.session.destroy((err) => {
-    if (err) {
+    try {
+      await clearAuthData(req.session);
+    } catch (err) {
       console.error('Session destruction error:', err);
     }
-  });
-  
-  // Build logout URL based on login type
-  let logoutUrl;
-  let params = {
-    post_logout_redirect_uri: `${config.server.appUrl}/`,
-  };
-  
-  if (loginType === 'osspid_direct') {
-    // Direct OSSPID logout
-    logoutUrl = `${config.osspid.host}/osspid-client/openid/v2/logout`;
-    params.client_id = config.osspid.clientId;
-  } else {
-    // Default Keycloak logout
-    logoutUrl = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/logout`;
-    params.client_id = config.keycloak.clientId;
+    
+    const idpLogoutCallback = `${config.server.appUrl}/logout-idp`;
+    const logoutUrl = AuthUrlBuilder.buildLogoutUrl('uatid', idToken, idpLogoutCallback);
+    
+    return res.redirect(logoutUrl);
   }
   
-  if (idToken) {
-    params.id_token_hint = idToken;
+  // Standard logout for other login types
+  try {
+    await clearAuthData(req.session);
+  } catch (err) {
+    console.error('Session destruction error:', err);
   }
   
-  res.redirect(`${logoutUrl}?${querystring.stringify(params)}`);
+  const redirectUri = `${config.server.appUrl}/`;
+  const logoutUrl = AuthUrlBuilder.buildLogoutUrl(loginType, idToken, redirectUri);
+  
+  res.redirect(logoutUrl);
 });
 
 /**
  * IDP Logout Callback Route
- * Handles the second step of UATID logout - logs out from the underlying IDP
- * This route is called after Keycloak logout completes
+ * Handles the second step of UATID logout
  */
 router.get('/logout-idp', (req, res) => {
-  // Build IDP logout URL (UATID IDP)
-  // The IDP hint tells us which IDP was used - for UATID it's 'uatid'
-  const idpLogoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/broker/${config.uatid.idpHint}/logout`;
-  
   const finalRedirectUri = `${config.server.appUrl}/`;
+  const idpLogoutUrl = AuthUrlBuilder.buildIdpLogoutUrl(finalRedirectUri);
   
-  const params = {
-    redirect_uri: finalRedirectUri,
-  };
-  
-  res.redirect(`${idpLogoutUrl}?${querystring.stringify(params)}`);
+  res.redirect(idpLogoutUrl);
 });
 
+// ==================== CALLBACK ROUTES ====================
+
 /**
- * OAuth2 Callback Route for Keycloak
- * Handles the callback from Keycloak after user authentication
- * Exchanges authorization code for access token and retrieves user information
+ * Keycloak OAuth2 Callback Route
  */
 router.get('/keycloak/callback', async (req, res) => {
-  const code = req.query.code;
+  const { code } = req.query;
   
-  if (!code) {
-    return res.status(400).send('Invalid callback: No authorization code received');
-  }
+  if (!validateCallbackCode(code, res)) return;
   
   try {
-    // Exchange authorization code for access token
-    const tokenEndpoint = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/token`;
+    // Exchange code for tokens
+    const tokens = await TokenService.exchangeKeycloakCode(code);
     
-    const postData = {
-      grant_type: 'authorization_code',
-      code: code,
-      client_id: config.keycloak.clientId,
-      client_secret: config.keycloak.clientSecret,
-      redirect_uri: config.keycloak.redirectUrl,
-    };
-    
-    const tokenResponse = await axios.post(tokenEndpoint, querystring.stringify(postData), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-    
-    const { access_token, refresh_token, id_token } = tokenResponse.data;
-    
-    if (!access_token) {
+    if (!tokens.access_token) {
       throw new Error('Access token not found in response');
     }
     
-    // Store tokens in session
-    req.session.login_type = 'keycloak';
-    req.session.refresh_token = refresh_token;
-    req.session.id_token = id_token;
-    
     // Fetch user information
-    const userinfoEndpoint = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/userinfo`;
+    const userData = await TokenService.fetchKeycloakUserInfo(tokens.access_token);
     
-    const userinfoResponse = await axios.get(userinfoEndpoint, {
-      headers: {
-        'Authorization': `Bearer ${access_token}`
-      }
-    });
-    
-    const userData = userinfoResponse.data;
-    
-    if (userData.preferred_username || userData.sub) {
-      req.session.user = userData;
-      res.redirect('/');
-    } else {
+    if (!userData.preferred_username && !userData.sub) {
       throw new Error('Failed to retrieve user information');
     }
     
+    // Store authentication data in session
+    storeAuthData(req.session, 'keycloak', tokens, userData);
+    
+    res.redirect('/');
+    
   } catch (error) {
-    console.error('OAuth Callback Error:', error.message);
-    const errorMsg = error.response?.data?.error_description || error.message;
-    res.status(500).send(`Authentication Error: ${errorMsg}`);
+    handleOAuthError(error, res, 'Keycloak OAuth');
   }
 });
 
 /**
  * Direct OSSPID OAuth2 Callback Route
- * Handles the callback from direct OSSPID after user authentication
- * Exchanges authorization code for access token and retrieves user information
  */
 router.get('/osspid-direct/callback', async (req, res) => {
   const { code, state } = req.query;
   
-  // Verify state parameter for CSRF protection
-  if (!req.session.oauth2_state || state !== req.session.oauth2_state) {
-    delete req.session.oauth2_state;
-    return res.status(400).send('Invalid state parameter. Possible CSRF attack.');
+  // Verify state for CSRF protection
+  if (!verifyState(req.session, state)) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Security Error</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 50px; background: #f5f5f5; }
+          .error { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          h1 { color: #d32f2f; }
+        </style>
+      </head>
+      <body>
+        <div class="error">
+          <h1>Security Error</h1>
+          <p>Invalid state parameter. Possible CSRF attack detected.</p>
+          <p><a href="/">← Back to Home</a></p>
+        </div>
+      </body>
+      </html>
+    `);
   }
-  delete req.session.oauth2_state;
   
-  if (!code) {
-    return res.status(400).send('Invalid callback: No authorization code received');
-  }
+  if (!validateCallbackCode(code, res)) return;
   
   try {
-    // Exchange authorization code for access token
-    const tokenEndpoint = `${config.osspid.host}/osspid-client/openid/v2/token`;
+    // Exchange code for tokens
+    const tokens = await TokenService.exchangeOsspidCode(code);
     
-    const postData = {
-      grant_type: 'authorization_code',
-      code: code,
-      client_id: config.osspid.clientId,
-      client_secret: config.osspid.clientSecret,
-      redirect_uri: config.osspid.redirectUrl,
-    };
-    
-    const tokenResponse = await axios.post(tokenEndpoint, querystring.stringify(postData), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-    
-    const { access_token, refresh_token, id_token } = tokenResponse.data;
-    
-    if (!access_token) {
-      const errorMsg = tokenResponse.data.error_description || tokenResponse.data.error || 'Access token not found in response';
+    if (!tokens.access_token) {
+      const errorMsg = tokens.error_description || tokens.error || 'Access token not found in response';
       throw new Error(errorMsg);
     }
     
-    // Store tokens in session
-    req.session.login_type = 'osspid_direct';
-    req.session.access_token = access_token;
-    req.session.refresh_token = refresh_token;
-    req.session.id_token = id_token;
-    
-    // Decode ID token to get user info
-    if (id_token) {
-      const userData = decodeJWT(id_token);
-      if (userData) {
-        req.session.user = userData;
-        return res.redirect('/');
-      }
+    // Extract user data from ID token
+    let userData = null;
+    if (tokens.id_token) {
+      userData = TokenService.getUserDataFromIdToken(tokens.id_token);
     }
     
     // Fallback user data if ID token decoding fails
-    req.session.user = {
-      sub: 'osspid_user',
-      authenticated: true,
-      provider: 'osspid_direct'
-    };
+    if (!userData) {
+      userData = {
+        sub: 'osspid_user',
+        authenticated: true,
+        provider: 'osspid_direct'
+      };
+    }
+    
+    // Store authentication data in session
+    storeAuthData(req.session, 'osspid_direct', tokens, userData);
     
     res.redirect('/');
     
   } catch (error) {
-    console.error('Direct OSSPID OAuth Callback Error:', error.message);
-    const errorMsg = error.response?.data?.error_description || error.response?.data?.error || error.message;
-    res.status(500).send(`Authentication Error: ${errorMsg}`);
+    handleOAuthError(error, res, 'Direct OSSPID OAuth');
   }
 });
 
 /**
  * UATID OAuth2 Callback Route
- * Handles the callback from UATID Keycloak realm after user authentication
- * Exchanges authorization code for access token and retrieves user information
  */
 router.get('/uatid/callback', async (req, res) => {
-  const code = req.query.code;
+  const { code } = req.query;
   
-  if (!code) {
-    return res.status(400).send('Invalid callback: No authorization code received');
-  }
+  if (!validateCallbackCode(code, res)) return;
   
   try {
-    // Exchange authorization code for access token using UATID realm
-    const tokenEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/token`;
+    // Exchange code for tokens
+    const tokens = await TokenService.exchangeUatidCode(code);
     
-    const postData = {
-      grant_type: 'authorization_code',
-      code: code,
-      client_id: config.uatid.clientId,
-      client_secret: config.uatid.clientSecret,
-      redirect_uri: config.uatid.redirectUrl,
-    };
-    
-    const tokenResponse = await axios.post(tokenEndpoint, querystring.stringify(postData), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-    
-    const { access_token, refresh_token, id_token } = tokenResponse.data;
-    
-    if (!access_token) {
+    if (!tokens.access_token) {
       throw new Error('Access token not found in response');
     }
     
-    // Store tokens in session
-    req.session.login_type = 'uatid';
-    req.session.refresh_token = refresh_token;
-    req.session.id_token = id_token;
-    
     // Fetch user information
-    const userinfoEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/userinfo`;
+    const userData = await TokenService.fetchUatidUserInfo(tokens.access_token);
     
-    const userinfoResponse = await axios.get(userinfoEndpoint, {
-      headers: {
-        'Authorization': `Bearer ${access_token}`
-      }
-    });
-    
-    const userData = userinfoResponse.data;
-    
-    if (userData.preferred_username || userData.sub) {
-      req.session.user = userData;
-      res.redirect('/');
-    } else {
+    if (!userData.preferred_username && !userData.sub) {
       throw new Error('Failed to retrieve user information');
     }
     
+    // Store authentication data in session
+    storeAuthData(req.session, 'uatid', tokens, userData);
+    
+    res.redirect('/');
+    
   } catch (error) {
-    console.error('UATID OAuth Callback Error:', error.message);
-    const errorMsg = error.response?.data?.error_description || error.message;
-    res.status(500).send(`Authentication Error: ${errorMsg}`);
+    handleOAuthError(error, res, 'UATID OAuth');
   }
 });
 
