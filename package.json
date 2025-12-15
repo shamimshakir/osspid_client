@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "docker-compose up -d",
+    "dev": "nodemon index.js",
     "stop": "docker-compose down",
     "logs": "docker-compose logs -f",
     "restart": "docker-compose restart",

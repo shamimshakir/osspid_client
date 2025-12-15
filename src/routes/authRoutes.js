@@ -37,7 +37,7 @@ router.get('/uatid-login', (req, res) => {
  * Redirects user to Keycloak showing all available IDPs
  */
 router.get('/all-login', (req, res) => {
-  const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl();
+  const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl(config.keycloak.idp);
   res.redirect(authorizeUrl);
 });
 

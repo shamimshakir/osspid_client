@@ -9,8 +9,8 @@ module.exports = {
   // Server Configuration
   server: {
     host: process.env.SERVER_HOST || '0.0.0.0',
-    port: parseInt(process.env.SERVER_PORT) || 3000,
-    appUrl: process.env.APP_URL || 'http://localhost:3000'
+    port: parseInt(process.env.SERVER_PORT) || 8000,
+    appUrl: process.env.APP_URL || 'http://localhost:8000'
   },
 
   // Keycloak Configuration
