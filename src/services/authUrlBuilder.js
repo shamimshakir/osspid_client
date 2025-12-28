@@ -52,7 +52,7 @@ class AuthUrlBuilder {
 
   /**
    * Build logout URL
-  * @param {string} loginType - Type of login (keycloak, osspid_direct)
+   * @param {string} loginType - Type of login (oidc, osspid_direct)
    * @param {string|null} idToken - ID token for logout hint
    * @param {string} redirectUri - Post-logout redirect URI
    * @returns {string} Logout URL
@@ -64,7 +64,7 @@ class AuthUrlBuilder {
     };
     
     switch (loginType) {
-      case 'keycloak':
+      case 'oidc':
         logoutUrl = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/logout`;
         params.client_id = config.keycloak.clientId;
         break;

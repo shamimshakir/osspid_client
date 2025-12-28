@@ -16,10 +16,10 @@ const router = express.Router();
 
 
 /**
- * OSSPID Login Route
- * Redirects user to Keycloak authentication page with OSSPID as IDP
+ * OIDC Login Route
+ * Redirects user to OIDC provider (Keycloak) authentication page with OSSPID as IDP
  */
-router.get('/keycloak-login', (req, res) => {
+router.get('/oidc-login', (req, res) => {
   const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl(config.keycloak.idp);
   res.redirect(authorizeUrl);
 });
@@ -135,9 +135,9 @@ router.get('/osspid-direct/callback', async (req, res) => {
 
 
 /**
- * Keycloak OAuth2 Callback Route
+ * OIDC OAuth2 Callback Route
  */
-router.get('/keycloak/callback', async (req, res) => {
+router.get('/oidc/callback', async (req, res) => {
   const { code } = req.query;
   
   if (!validateCallbackCode(code, res)) return;
@@ -158,12 +158,12 @@ router.get('/keycloak/callback', async (req, res) => {
     }
     
     // Store authentication data in session
-    storeAuthData(req.session, 'keycloak', tokens, userData);
+    storeAuthData(req.session, 'oidc', tokens, userData);
     
     res.redirect('/');
     
   } catch (error) {
-    handleOAuthError(error, res, 'Keycloak OAuth');
+    handleOAuthError(error, res, 'OIDC OAuth');
   }
 });
 

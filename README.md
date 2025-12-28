@@ -139,13 +139,13 @@ npm run rebuild
 
 ### Authentication Routes
 - **`/osspid-direct-login`** - Direct OSSPID authentication
-- **`/keycloak-login`** - Keycloak login
+- **`/oidc-login`** - OIDC login
 - **`/osspid-direct-login`** - Direct OSSPID authentication
 - **`/logout`** - Logout from current session
 
 ### Callback Routes
 - **`/osspid-direct/callback`** - Direct OSSPID callback handler
-- **`/keycloak/callback`** - Keycloak callback handler
+- **`/oidc/callback`** - OIDC callback handler
 
 ## 📁 Project Structure
 

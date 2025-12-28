@@ -62,7 +62,7 @@ app.listen(port, host, () => {
   console.log(`   - http://${host}:${port}/ (Home)`);
   console.log(`   - http://${host}:${port}/health (Health Check)`);
   console.log(`   - http://${host}:${port}/osspid-direct-login (Direct OSSPID)`);
-  console.log(`   - http://${host}:${port}/keycloak-login (Keycloak login)`);
+  console.log(`   - http://${host}:${port}/oidc-login (OIDC login)`);
 });
 
 module.exports = app;

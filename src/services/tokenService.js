@@ -93,13 +93,13 @@ class TokenService {
   /**
    * Refresh access token using refresh token
    * @param {string} refreshToken - Refresh token
-   * @param {string} loginType - Type of login ('keycloak', 'osspid_direct')
+   * @param {string} loginType - Type of login ('oidc', 'osspid_direct')
    * @returns {Promise<object>} Token response
    */
   static async refreshAccessToken(refreshToken, loginType = 'osspid_direct') {
     let tokenEndpoint, clientId, clientSecret;
 
-    if (loginType === 'keycloak') {
+    if (loginType === 'oidc') {
       tokenEndpoint = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/token`;
       clientId = config.keycloak.clientId;
       clientSecret = config.keycloak.clientSecret;

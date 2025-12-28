@@ -19,7 +19,7 @@ module.exports = {
     realm: process.env.KEYCLOAK_REALM || 'myrealm',
     clientId: process.env.KEYCLOAK_CLIENT_ID || 'ss-client',
     clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || '2QvtLNIDHLlvAMHsAMqwoba0AfF091Cu',
-    redirectUrl: process.env.APP_URL ? `${process.env.APP_URL}/keycloak/callback` : 'http://localhost:3000/keycloak/callback',
+    redirectUrl: process.env.APP_URL ? `${process.env.APP_URL}/oidc/callback` : 'http://localhost:3000/oidc/callback',
     idp: process.env.KEYCLOAK_IDP || 'osspid'
   },
 
