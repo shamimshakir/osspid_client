@@ -8,11 +8,7 @@ const crypto = require('crypto');
 const config = require('../../config');
 
 class AuthUrlBuilder {
-  /**
-   * Build Keycloak authorization URL
-   * @param {string|null} idpHint - Identity provider hint (optional)
-   * @returns {string} Authorization URL
-   */
+  // Supported flows: Keycloak and direct OSSPID
   static buildKeycloakAuthUrl(idpHint = null) {
     const url = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/auth`;
     
@@ -30,26 +26,7 @@ class AuthUrlBuilder {
     return `${url}?${querystring.stringify(params)}`;
   }
 
-  /**
-   * Build UATID authorization URL
-   * @returns {string} Authorization URL
-   */
-  static buildUatidAuthUrl() {
-    const url = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/auth`;
-    
-    const params = {
-      response_type: 'code',
-      scope: 'openid profile email',
-      client_id: config.uatid.clientId,
-      redirect_uri: config.uatid.redirectUrl,
-    };
-    
-    if (config.uatid.idpHint) {
-      params.kc_idp_hint = config.uatid.idpHint;
-    }
-    
-    return `${url}?${querystring.stringify(params)}`;
-  }
+  // UATID flow removed: application supports Keycloak and direct OSSPID only.
 
   /**
    * Build direct OSSPID authorization URL
@@ -75,7 +52,7 @@ class AuthUrlBuilder {
 
   /**
    * Build logout URL
-   * @param {string} loginType - Type of login (keycloak, uatid, osspid_direct)
+  * @param {string} loginType - Type of login (keycloak, osspid_direct)
    * @param {string|null} idToken - ID token for logout hint
    * @param {string} redirectUri - Post-logout redirect URI
    * @returns {string} Logout URL
@@ -87,17 +64,18 @@ class AuthUrlBuilder {
     };
     
     switch (loginType) {
-      case 'uatid':
-        logoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/logout`;
-        params.client_id = config.uatid.clientId;
+      case 'keycloak':
+        logoutUrl = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/logout`;
+        params.client_id = config.keycloak.clientId;
         break;
       case 'osspid_direct':
         logoutUrl = `${config.osspid.host}/osspid-client/openid/v2/logout`;
         params.client_id = config.osspid.clientId;
         break;
       default:
-        logoutUrl = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/logout`;
-        params.client_id = config.keycloak.clientId;
+        // Default to OSSPID direct logout when no specific provider is set
+        logoutUrl = `${config.osspid.host}/osspid-client/openid/v2/logout`;
+        params.client_id = config.osspid.clientId;
     }
     
     if (idToken) {
@@ -108,14 +86,13 @@ class AuthUrlBuilder {
   }
 
   /**
-   * Build IDP logout URL for UATID
+   * Build IDP logout URL
+   * Note: brokered IDP logout flow removed; default to OSSPID logout redirect
    * @param {string} redirectUri - Final redirect URI after IDP logout
    * @returns {string} IDP logout URL
    */
   static buildIdpLogoutUrl(redirectUri) {
-    const idpLogoutUrl = `${config.uatid.host}/realms/${config.uatid.realm}/broker/${config.uatid.idpHint}/logout`;
-    
-    return `${idpLogoutUrl}?${querystring.stringify({ redirect_uri: redirectUri })}`;
+    return `${config.osspid.host}/osspid-client/openid/v2/logout?${querystring.stringify({ redirect_uri: redirectUri })}`;
   }
 }
 

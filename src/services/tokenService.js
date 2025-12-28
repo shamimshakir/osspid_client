@@ -33,31 +33,9 @@ class TokenService {
     
     return response.data;
   }
+  // Keycloak exchange is available via `exchangeKeycloakCode`; UATID flow removed.
 
-  /**
-   * Exchange authorization code for tokens (UATID)
-   * @param {string} code - Authorization code
-   * @returns {Promise<object>} Token response
-   */
-  static async exchangeUatidCode(code) {
-    const tokenEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/token`;
-    
-    const postData = {
-      grant_type: 'authorization_code',
-      code: code,
-      client_id: config.uatid.clientId,
-      client_secret: config.uatid.clientSecret,
-      redirect_uri: config.uatid.redirectUrl,
-    };
-    
-    const response = await axios.post(tokenEndpoint, querystring.stringify(postData), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-    
-    return response.data;
-  }
+  // UATID exchange removed
 
   /**
    * Exchange authorization code for tokens (Direct OSSPID)
@@ -84,6 +62,8 @@ class TokenService {
     return response.data;
   }
 
+  // Keycloak userinfo available via `fetchKeycloakUserInfo`.
+
   /**
    * Fetch user information from Keycloak
    * @param {string} accessToken - Access token
@@ -91,23 +71,6 @@ class TokenService {
    */
   static async fetchKeycloakUserInfo(accessToken) {
     const userinfoEndpoint = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/userinfo`;
-    
-    const response = await axios.get(userinfoEndpoint, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-    
-    return response.data;
-  }
-
-  /**
-   * Fetch user information from UATID
-   * @param {string} accessToken - Access token
-   * @returns {Promise<object>} User data
-   */
-  static async fetchUatidUserInfo(accessToken) {
-    const userinfoEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/userinfo`;
     
     const response = await axios.get(userinfoEndpoint, {
       headers: {
@@ -130,35 +93,36 @@ class TokenService {
   /**
    * Refresh access token using refresh token
    * @param {string} refreshToken - Refresh token
-   * @param {string} loginType - Type of login (keycloak, uatid)
+   * @param {string} loginType - Type of login ('keycloak', 'osspid_direct')
    * @returns {Promise<object>} Token response
    */
-  static async refreshAccessToken(refreshToken, loginType = 'keycloak') {
+  static async refreshAccessToken(refreshToken, loginType = 'osspid_direct') {
     let tokenEndpoint, clientId, clientSecret;
-    
-    if (loginType === 'uatid') {
-      tokenEndpoint = `${config.uatid.host}/realms/${config.uatid.realm}/protocol/openid-connect/token`;
-      clientId = config.uatid.clientId;
-      clientSecret = config.uatid.clientSecret;
-    } else {
+
+    if (loginType === 'keycloak') {
       tokenEndpoint = `${config.keycloak.host}/realms/${config.keycloak.realm}/protocol/openid-connect/token`;
       clientId = config.keycloak.clientId;
       clientSecret = config.keycloak.clientSecret;
+    } else {
+      // default to OSSPID direct token endpoint
+      tokenEndpoint = `${config.osspid.host}/osspid-client/openid/v2/token`;
+      clientId = config.osspid.clientId;
+      clientSecret = config.osspid.clientSecret;
     }
-    
+
     const postData = {
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
       client_id: clientId,
       client_secret: clientSecret,
     };
-    
+
     const response = await axios.post(tokenEndpoint, querystring.stringify(postData), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     });
-    
+
     return response.data;
   }
 }

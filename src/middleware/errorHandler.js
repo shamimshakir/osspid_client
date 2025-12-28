@@ -6,7 +6,7 @@
  * OAuth error handler
  * @param {Error} error - Error object
  * @param {object} res - Express response object
- * @param {string} context - Error context (e.g., 'Keycloak', 'UATID')
+ * @param {string} context - Error context (e.g., 'Keycloak')
  */
 function handleOAuthError(error, res, context = 'Authentication') {
   console.error(`${context} Error:`, error.message);

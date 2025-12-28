@@ -62,9 +62,7 @@ app.listen(port, host, () => {
   console.log(`   - http://${host}:${port}/ (Home)`);
   console.log(`   - http://${host}:${port}/health (Health Check)`);
   console.log(`   - http://${host}:${port}/osspid-direct-login (Direct OSSPID)`);
-  console.log(`   - http://${host}:${port}/osspid-login (OSSPID via Keycloak)`);
-  console.log(`   - http://${host}:${port}/uatid-login (UATID)`);
-  console.log(`   - http://${host}:${port}/all-login (Keycloak IDP Login)`);
+  console.log(`   - http://${host}:${port}/keycloak-login (Keycloak login)`);
 });
 
 module.exports = app;

@@ -14,32 +14,17 @@ const router = express.Router();
 
 // ==================== LOGIN ROUTES ====================
 
+
 /**
  * OSSPID Login Route
  * Redirects user to Keycloak authentication page with OSSPID as IDP
  */
-router.get('/osspid-login', (req, res) => {
+router.get('/keycloak-login', (req, res) => {
   const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl(config.keycloak.idp);
   res.redirect(authorizeUrl);
 });
 
-/**
- * UATID Login Route
- * Redirects user to UATID Keycloak realm
- */
-router.get('/uatid-login', (req, res) => {
-  const authorizeUrl = AuthUrlBuilder.buildUatidAuthUrl();
-  res.redirect(authorizeUrl);
-});
 
-/**
- * All Login Options Route
- * Redirects user to Keycloak showing all available IDPs
- */
-router.get('/all-login', (req, res) => {
-  const authorizeUrl = AuthUrlBuilder.buildKeycloakAuthUrl(config.keycloak.idp);
-  res.redirect(authorizeUrl);
-});
 
 /**
  * Direct OSSPID Login Route
@@ -50,6 +35,7 @@ router.get('/osspid-direct-login', (req, res) => {
   res.redirect(authorizeUrl);
 });
 
+
 // ==================== LOGOUT ROUTES ====================
 
 /**
@@ -58,21 +44,9 @@ router.get('/osspid-direct-login', (req, res) => {
  */
 router.get('/logout', async (req, res) => {
   const idToken = req.session.id_token;
-  const loginType = req.session.login_type || 'keycloak';
+  const loginType = req.session.login_type || 'osspid_direct';
   
-  // Special handling for UATID two-step logout
-  if (loginType === 'uatid') {
-    try {
-      await clearAuthData(req.session);
-    } catch (err) {
-      console.error('Session destruction error:', err);
-    }
-    
-    const idpLogoutCallback = `${config.server.appUrl}/logout-idp`;
-    const logoutUrl = AuthUrlBuilder.buildLogoutUrl('uatid', idToken, idpLogoutCallback);
-    
-    return res.redirect(logoutUrl);
-  }
+  // Standard logout for all login types
   
   // Standard logout for other login types
   try {
@@ -87,51 +61,11 @@ router.get('/logout', async (req, res) => {
   res.redirect(logoutUrl);
 });
 
-/**
- * IDP Logout Callback Route
- * Handles the second step of UATID logout
- */
-router.get('/logout-idp', (req, res) => {
-  const finalRedirectUri = `${config.server.appUrl}/`;
-  const idpLogoutUrl = AuthUrlBuilder.buildIdpLogoutUrl(finalRedirectUri);
-  
-  res.redirect(idpLogoutUrl);
-});
+// UATID two-step logout removed
 
 // ==================== CALLBACK ROUTES ====================
 
-/**
- * Keycloak OAuth2 Callback Route
- */
-router.get('/keycloak/callback', async (req, res) => {
-  const { code } = req.query;
-  
-  if (!validateCallbackCode(code, res)) return;
-  
-  try {
-    // Exchange code for tokens
-    const tokens = await TokenService.exchangeKeycloakCode(code);
-    
-    if (!tokens.access_token) {
-      throw new Error('Access token not found in response');
-    }
-    
-    // Fetch user information
-    const userData = await TokenService.fetchKeycloakUserInfo(tokens.access_token);
-    
-    if (!userData.preferred_username && !userData.sub) {
-      throw new Error('Failed to retrieve user information');
-    }
-    
-    // Store authentication data in session
-    storeAuthData(req.session, 'keycloak', tokens, userData);
-    
-    res.redirect('/');
-    
-  } catch (error) {
-    handleOAuthError(error, res, 'Keycloak OAuth');
-  }
-});
+// Keycloak callback and direct IdP login routes removed.
 
 /**
  * Direct OSSPID OAuth2 Callback Route
@@ -199,37 +133,40 @@ router.get('/osspid-direct/callback', async (req, res) => {
   }
 });
 
+
 /**
- * UATID OAuth2 Callback Route
+ * Keycloak OAuth2 Callback Route
  */
-router.get('/uatid/callback', async (req, res) => {
+router.get('/keycloak/callback', async (req, res) => {
   const { code } = req.query;
   
   if (!validateCallbackCode(code, res)) return;
   
   try {
     // Exchange code for tokens
-    const tokens = await TokenService.exchangeUatidCode(code);
+    const tokens = await TokenService.exchangeKeycloakCode(code);
     
     if (!tokens.access_token) {
       throw new Error('Access token not found in response');
     }
     
     // Fetch user information
-    const userData = await TokenService.fetchUatidUserInfo(tokens.access_token);
+    const userData = await TokenService.fetchKeycloakUserInfo(tokens.access_token);
     
     if (!userData.preferred_username && !userData.sub) {
       throw new Error('Failed to retrieve user information');
     }
     
     // Store authentication data in session
-    storeAuthData(req.session, 'uatid', tokens, userData);
+    storeAuthData(req.session, 'keycloak', tokens, userData);
     
     res.redirect('/');
     
   } catch (error) {
-    handleOAuthError(error, res, 'UATID OAuth');
+    handleOAuthError(error, res, 'Keycloak OAuth');
   }
 });
+
+// UATID callback removed
 
 module.exports = router;

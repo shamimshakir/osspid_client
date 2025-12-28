@@ -1,14 +1,13 @@
 # 🔐 OSSPID Client
 
-A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrates authentication integration with Keycloak and OSSPID server. **Runs exclusively with Docker for consistent deployment.**
+A Node.js/Express-based OAuth2/OpenID Connect client application that demonstrates authentication integration with OSSPID (direct and via Keycloak). **Runs with Docker for convenient deployment.**
 
 ## ✨ Features
 
 - 🔐 **Multiple Authentication Methods**:
-  - Direct OSSPID login (bypassing Keycloak)
-  - OSSPID login via Keycloak
-  - UATID login via Keycloak
-  - All providers view via Keycloak
+- 🔐 **Multiple Authentication Methods**:
+  - Direct OSSPID login (bypassing an external broker)
+  - Keycloak login (OSSPID via Keycloak)
 
 - 🐳 **Docker-Ready**:
   - Production-optimized Docker setup
@@ -99,21 +98,14 @@ environment:
   - APP_URL=http://localhost:3000
   
   # Keycloak Configuration
-  - KEYCLOAK_HOST=http://192.168.0.108:8880
-  - KEYCLOAK_REALM=myrealm
-  - KEYCLOAK_CLIENT_ID=ss-client
-  - KEYCLOAK_CLIENT_SECRET=your-secret
+  (Keycloak configuration present — this project uses Keycloak and direct OSSPID flows.)
   
   # OSSPID Configuration
   - OSSPID_HOST=http://192.168.0.108:8050
   - OSSPID_CLIENT_ID=your-client-id
   - OSSPID_CLIENT_SECRET=your-secret
   
-  # UATID Configuration
-  - UATID_HOST=https://idpv2.oss.net.bd
-  - UATID_REALM=osspid
-  - UATID_CLIENT_ID=id-client-local
-  - UATID_CLIENT_SECRET=your-secret
+  (UATID configuration removed)
   
   # Session Configuration
   - SESSION_SECRET=change-this-in-production
@@ -131,17 +123,11 @@ npm run rebuild
 | `SERVER_PORT` | Application port | `3000` |
 | `SERVER_HOST` | Bind address | `0.0.0.0` |
 | `APP_URL` | External URL | `http://localhost:3000` |
-| `KEYCLOAK_HOST` | Keycloak server URL | `http://192.168.0.108:8880` |
-| `KEYCLOAK_REALM` | Keycloak realm | `myrealm` |
-| `KEYCLOAK_CLIENT_ID` | Keycloak client ID | `ss-client` |
-| `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret | - |
+<!-- Keycloak variables removed -->
 | `OSSPID_HOST` | OSSPID server URL | `http://192.168.0.108:8050` |
 | `OSSPID_CLIENT_ID` | OSSPID client ID | - |
 | `OSSPID_CLIENT_SECRET` | OSSPID client secret | - |
-| `UATID_HOST` | UATID server URL | `https://idpv2.oss.net.bd` |
-| `UATID_REALM` | UATID realm | `osspid` |
-| `UATID_CLIENT_ID` | UATID client ID | `id-client-local` |
-| `UATID_CLIENT_SECRET` | UATID client secret | - |
+<!-- UATID variables removed -->
 | `SESSION_SECRET` | Session encryption key | ⚠️ Change in production! |
 
 ## 🌐 Available Routes
@@ -153,15 +139,13 @@ npm run rebuild
 
 ### Authentication Routes
 - **`/osspid-direct-login`** - Direct OSSPID authentication
-- **`/osspid-login`** - OSSPID via Keycloak
-- **`/uatid-login`** - UATID via Keycloak
-- **`/all-login`** - View all available providers
+- **`/keycloak-login`** - Keycloak login
+- **`/osspid-direct-login`** - Direct OSSPID authentication
 - **`/logout`** - Logout from current session
 
 ### Callback Routes
 - **`/osspid-direct/callback`** - Direct OSSPID callback handler
 - **`/keycloak/callback`** - Keycloak callback handler
-- **`/uatid/callback`** - UATID callback handler
 
 ## 📁 Project Structure
 

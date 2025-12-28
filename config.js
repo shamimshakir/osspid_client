@@ -13,7 +13,7 @@ module.exports = {
     appUrl: process.env.APP_URL || 'http://localhost:8000'
   },
 
-  // Keycloak Configuration
+  // Keycloak Configuration (used for OSSPID via Keycloak)
   keycloak: {
     host: process.env.KEYCLOAK_HOST || 'http://192.168.0.108:8880',
     realm: process.env.KEYCLOAK_REALM || 'myrealm',
@@ -31,15 +31,6 @@ module.exports = {
     redirectUrl: process.env.APP_URL ? `${process.env.APP_URL}/osspid-direct/callback` : 'http://localhost:3000/osspid-direct/callback'
   },
 
-  // UATID Configuration (via External Keycloak)
-  uatid: {
-    host: process.env.UATID_HOST || 'https://idpv2.oss.net.bd',
-    realm: process.env.UATID_REALM || 'osspid',
-    clientId: process.env.UATID_CLIENT_ID || 'id-client-local',
-    clientSecret: process.env.UATID_CLIENT_SECRET || 'cxYiKNaFMNS7gIjTiRYUipjYeE1fD5oJ',
-    redirectUrl: process.env.APP_URL ? `${process.env.APP_URL}/uatid/callback` : 'http://localhost:3000/uatid/callback',
-    idpHint: process.env.UATID_IDP_HINT || 'uatid'
-  },
 
   // Session Configuration
   session: {
